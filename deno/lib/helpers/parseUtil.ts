@@ -32,51 +32,34 @@ export const ZodParsedType = util.arrayToEnum([
 
 export type ZodParsedType = keyof typeof ZodParsedType;
 
-function cacheAndReturn(
-  data: any,
-  parsedType: ZodParsedType,
-  cache?: Map<any, ZodParsedType>
-) {
-  if (cache) cache.set(data, parsedType);
-  return parsedType;
-}
-
-export const getParsedType = (
-  data: any,
-  cache?: Map<any, ZodParsedType>
-): ZodParsedType => {
-  if (cache && cache.has(data)) return cache.get(data)!;
+export const getParsedType = (data: any): ZodParsedType => {
   const t = typeof data;
 
   switch (t) {
     case "undefined":
-      return cacheAndReturn(data, ZodParsedType.undefined, cache);
+      return ZodParsedType.undefined;
 
     case "string":
-      return cacheAndReturn(data, ZodParsedType.string, cache);
+      return ZodParsedType.string;
 
     case "number":
-      return cacheAndReturn(
-        data,
-        isNaN(data) ? ZodParsedType.nan : ZodParsedType.number,
-        cache
-      );
+      return isNaN(data) ? ZodParsedType.nan : ZodParsedType.number;
 
     case "boolean":
-      return cacheAndReturn(data, ZodParsedType.boolean, cache);
+      return ZodParsedType.boolean;
 
     case "function":
-      return cacheAndReturn(data, ZodParsedType.function, cache);
+      return ZodParsedType.function;
 
     case "bigint":
-      return cacheAndReturn(data, ZodParsedType.bigint, cache);
+      return ZodParsedType.bigint;
 
     case "object":
       if (Array.isArray(data)) {
-        return cacheAndReturn(data, ZodParsedType.array, cache);
+        return ZodParsedType.array;
       }
       if (data === null) {
-        return cacheAndReturn(data, ZodParsedType.null, cache);
+        return ZodParsedType.null;
       }
       if (
         data.then &&
@@ -84,21 +67,21 @@ export const getParsedType = (
         data.catch &&
         typeof data.catch === "function"
       ) {
-        return cacheAndReturn(data, ZodParsedType.promise, cache);
+        return ZodParsedType.promise;
       }
-      if (data instanceof Map) {
-        return cacheAndReturn(data, ZodParsedType.map, cache);
+      if (typeof Map !== "undefined" && data instanceof Map) {
+        return ZodParsedType.map;
       }
-      if (data instanceof Set) {
-        return cacheAndReturn(data, ZodParsedType.set, cache);
+      if (typeof Set !== "undefined" && data instanceof Set) {
+        return ZodParsedType.set;
       }
-      if (data instanceof Date) {
-        return cacheAndReturn(data, ZodParsedType.date, cache);
+      if (typeof Date !== "undefined" && data instanceof Date) {
+        return ZodParsedType.date;
       }
-      return cacheAndReturn(data, ZodParsedType.object, cache);
+      return ZodParsedType.object;
 
     default:
-      return cacheAndReturn(data, ZodParsedType.unknown, cache);
+      return ZodParsedType.unknown;
   }
 };
 
@@ -142,13 +125,14 @@ export type ParsePath = ParsePathComponent[];
 export const EMPTY_PATH: ParsePath = [];
 
 export interface ParseContext {
+  readonly common: {
+    readonly issues: ZodIssue[];
+    readonly contextualErrorMap?: ZodErrorMap;
+    readonly async: boolean;
+  };
   readonly path: ParsePath;
-  readonly issues: ZodIssue[];
   readonly schemaErrorMap?: ZodErrorMap;
-  readonly contextualErrorMap?: ZodErrorMap;
-  readonly async: boolean;
   readonly parent: ParseContext | null;
-  readonly typeCache: Map<any, ZodParsedType>;
   readonly data: any;
   readonly parsedType: ZodParsedType;
 }
@@ -168,13 +152,13 @@ export function addIssueToContext(
     data: ctx.data,
     path: ctx.path,
     errorMaps: [
-      ctx.contextualErrorMap, // contextual error map is first priority
+      ctx.common.contextualErrorMap, // contextual error map is first priority
       ctx.schemaErrorMap, // then schema-bound map if available
       overrideErrorMap, // then global override map
       defaultErrorMap, // then global default map
     ].filter((x) => !!x) as ZodErrorMap[],
   });
-  ctx.issues.push(issue);
+  ctx.common.issues.push(issue);
 }
 
 export type ObjectPair = {
@@ -272,4 +256,5 @@ export const isValid = <T>(x: ParseReturnType<T>): x is OK<T> | DIRTY<T> =>
   (x as any).status === "valid";
 export const isAsync = <T>(
   x: ParseReturnType<T>
-): x is AsyncParseReturnType<T> => x instanceof Promise;
+): x is AsyncParseReturnType<T> =>
+  typeof Promise !== undefined && x instanceof Promise;

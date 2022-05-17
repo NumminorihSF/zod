@@ -128,7 +128,9 @@ test("array minimum", () => {
   } catch (err) {
     const zerr: ZodError = err as any;
     expect(zerr.issues[0].code).toEqual(ZodIssueCode.too_small);
-    expect(zerr.issues[0].message).toEqual(`Should have at least 3 items`);
+    expect(zerr.issues[0].message).toEqual(
+      `Array must contain at least 3 element(s)`
+    );
   }
 });
 
@@ -293,13 +295,23 @@ test("formatting", () => {
     expect(error.inner?.name?.[1]).toEqual(undefined);
   }
   if (!result2.success) {
-    const error = result2.error.format();
+    type FormattedError = z.inferFormattedError<typeof schema>;
+    const error: FormattedError = result2.error.format();
     expect(error._errors).toEqual([]);
     expect(error.inner?._errors).toEqual([]);
     expect(error.inner?.name?._errors).toEqual(["Invalid input"]);
     expect(error.inner?.name?.[0]).toEqual(undefined);
     expect(error.inner?.name?.[1]).toEqual(undefined);
     expect(error.inner?.name?.[2]).toEqual(undefined);
+  }
+
+  // test custom mapper
+  if (!result2.success) {
+    type FormattedError = z.inferFormattedError<typeof schema, number>;
+    const error: FormattedError = result2.error.format(() => 5);
+    expect(error._errors).toEqual([]);
+    expect(error.inner?._errors).toEqual([]);
+    expect(error.inner?.name?._errors).toEqual([5]);
   }
 });
 
@@ -395,6 +407,58 @@ test("strict error message", () => {
   expect(result.success).toEqual(false);
   if (!result.success) {
     expect(result.error.issues[0].message).toEqual(errorMsg);
+  }
+});
+
+test("enum error message, invalid enum elementstring", () => {
+  try {
+    z.enum(["Tuna", "Trout"]).parse("Salmon");
+  } catch (err) {
+    const zerr: z.ZodError = err as any;
+    expect(zerr.issues.length).toEqual(1);
+    expect(zerr.issues[0].message).toEqual(
+      "Invalid enum value. Expected 'Tuna' | 'Trout', received 'Salmon'"
+    );
+  }
+});
+
+test("enum error message, invalid type", () => {
+  try {
+    z.enum(["Tuna", "Trout"]).parse(12);
+  } catch (err) {
+    const zerr: z.ZodError = err as any;
+    expect(zerr.issues.length).toEqual(1);
+    expect(zerr.issues[0].message).toEqual(
+      "Expected 'Tuna' | 'Trout', received number"
+    );
+  }
+});
+
+test("nativeEnum default error message", () => {
+  enum Fish {
+    Tuna = "Tuna",
+    Trout = "Trout",
+  }
+  try {
+    z.nativeEnum(Fish).parse("Salmon");
+  } catch (err) {
+    const zerr: z.ZodError = err as any;
+    expect(zerr.issues.length).toEqual(1);
+    expect(zerr.issues[0].message).toEqual(
+      "Invalid enum value. Expected 'Tuna' | 'Trout', received 'Salmon'"
+    );
+  }
+});
+
+test("literal default error message", () => {
+  try {
+    z.literal("Tuna").parse("Trout");
+  } catch (err) {
+    const zerr: z.ZodError = err as any;
+    expect(zerr.issues.length).toEqual(1);
+    expect(zerr.issues[0].message).toEqual(
+      `Invalid literal value, expected "Tuna"`
+    );
   }
 });
 
